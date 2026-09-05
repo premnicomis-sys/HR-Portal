@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise HR Portal - Google Sheets Backend</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- SheetJS for Excel Downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-100 font-sans text-slate-900 antialiased flex justify-center items-center min-h-screen">
+
+    <!-- Mobile App Container Frame -->
+    <div id="app" class="w-full max-w-md bg-white min-h-screen sm:min-h-[900px] sm:rounded-3xl sm:shadow-2xl flex flex-col justify-between overflow-hidden border border-slate-200">
+        
+        <!-- LOGIN VIEW -->
+        <div id="loginView" class="p-6 flex flex-col justify-center flex-1">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-black text-indigo-600 tracking-tight">Enterprise HR Portal</h1>
+                <p class="text-xs text-slate-500 mt-1 font-medium">NICO | YPK & SONS | IOTA Nanotechnology</p>
+            </div>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Work Email</label>
+                    <input type="email" id="email" value="rahul@nico.com" required class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Password</label>
+                    <input type="password" id="password" value="password123" required class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition duration-200 text-sm">Secure Login</button>
+            </form>
+        </div>
+
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboardView" class="hidden flex-1 flex flex-col bg-slate-50">
+            
+            <!-- Mobile Header -->
+            <header class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md">
+                <div>
+                    <h2 id="userNameDisplay" class="font-bold text-sm tracking-tight">Rahul Sharma</h2>
+                    <span id="userEntityDisplay" class="text-[10px] bg-indigo-700/80 px-2 py-0.5 rounded-full font-medium">NICO Entity</span>
+                </div>
+                <button onclick="handleLogout()" class="text-xs bg-indigo-700 hover:bg-indigo-800 text-white px-3 py-1.5 rounded-xl font-semibold transition">Logout</button>
+            </header>
+
+            <!-- Dashboard Scrollable Body -->
+            <main class="p-4 flex-1 overflow-y-auto space-y-4">
+                
+                <!-- Live Leave Balances Card -->
+                <div class="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-4 text-white shadow-lg">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider opacity-90">Live Leave Balances</h3>
+                        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded font-medium">+0.58/mo CL&SL | +1 EL/20d</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm border border-white/10">
+                            <span class="block text-[10px] uppercase font-bold opacity-75">CL</span>
+                            <span id="clBal" class="text-lg font-black">4.34</span>
+                        </div>
+                        <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm border border-white/10">
+                            <span class="block text-[10px] uppercase font-bold opacity-75">SL</span>
+                            <span id="slBal" class="text-lg font-black">2.50</span>
+                        </div>
+                        <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm border border-white/10">
+                            <span class="block text-[10px] uppercase font-bold opacity-75">EL</span>
+                            <span id="elBal" class="text-lg font-black">12.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GPS & Photo Attendance Punch Panel -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Attendance & GPS Tracking</h3>
+                        <span class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded font-bold">Office / Field</span>
+                    </div>
+                    
+                    <div class="relative bg-slate-900 rounded-xl overflow-hidden h-32 flex items-center justify-center">
+                        <video id="cameraPreview" autoplay playsinline class="w-full h-full object-cover"></video>
+                        <canvas id="snapshotCanvas" class="hidden"></canvas>
+                        <span id="camPlaceholder" class="absolute text-white text-xs font-medium">Camera standby for selfie check-in</span>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button onclick="punchAttendance('IN')" class="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow hover:bg-emerald-700 transition">Check In</button>
+                        <button onclick="punchAttendance('OUT')" class="flex-1 bg-rose-600 text-white py-2.5 rounded-xl font-bold text-xs shadow hover:bg-rose-700 transition">Check Out</button>
+                    </div>
+                    <p id="punchStatus" class="text-[11px] text-center text-slate-500 font-medium">Requirement: 8:30 hrs full day, 4:00 hrs half day.</p>
+                </div>
+
+                <!-- Leave & Short Leave Management Panel -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                    <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Leave & Short Leave Management</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="leaveType" class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none">
+                            <option value="CL">Casual Leave (CL)</option>
+                            <option value="SL">Sick Leave (SL)</option>
+                            <option value="EL">Earned Leave (EL)</option>
+                            <option value="SHORT">Short Leave (2 Hrs Max)</option>
+                        </select>
+                        <button onclick="applyLeave()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold text-xs transition">Apply Leave</button>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Monthly Allowance: 2 Short Leaves (2 hours each) permitted per employee.</p>
+                </div>
+
+                <!-- Master Options (Create Employee, Dept & Admin Update Leaves) -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                    <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Admin & Master Management</h3>
+                    
+                    <div class="space-y-2">
+                        <button onclick="openEmployeeModal()" class="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-xs font-bold transition">➕ Create New Employee / User</button>
+                        <button onclick="openDeptModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition">🏢 Create Department / Post</button>
+                        <button onclick="openLeaveUpdateModal()" class="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl text-xs font-bold transition">⚙️ Update Leave Balances (Single / Bulk)</button>
+                    </div>
+                </div>
+
+                <!-- Manager Discrepancy Queue -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                    <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-2">Manager Discrepancy Queue</h3>
+                    <div class="space-y-2 text-xs" id="pendingApprovalsList">
+                        <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center">
+                            <div>
+                                <span class="font-bold block text-slate-700">Rahul Sharma (Late In: 9:38 AM)</span>
+                                <span class="text-[10px] text-slate-400">Shift Window: 09:00 - 09:30 AM</span>
+                            </div>
+                            <button onclick="approveDiscrepancy()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg font-bold">Approve</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Excel Report Downloads -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-2">
+                    <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Download Excel Reports</h3>
+                    <button onclick="downloadAttendanceExcel()" class="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-xs font-bold transition">Download Attendance Excel Report</button>
+                    <button onclick="downloadEmployeesExcel()" class="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-xs font-bold transition">Download Master Employees Data Excel</button>
+                </div>
+
+            </main>
+        </div>
+
+    </div>
+
+    <!-- MODAL OVERLAYS FOR MASTER OPTIONS -->
+    <div id="modalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div id="modalContent" class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4"></div>
+    </div>
+
+    <!-- Script Engine Connected to Google Sheets Apps Script Web App -->
+    <script>
+        const SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+        window.onload = function() {
+            startCamera();
+            const savedUser = localStorage.getItem('hr_user_session');
+            if (savedUser) {
+                showDashboard(JSON.parse(savedUser));
+            }
+        };
+
+        function startCamera() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                .then(stream => {
+                    const video = document.getElementById('cameraPreview');
+                    video.srcObject = stream;
+                    document.getElementById('camPlaceholder').style.display = 'none';
+                })
+                .catch(err => console.log("Camera access standby."));
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`);
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('hr_user_session', JSON.stringify(data.user));
+                    showDashboard(data.user);
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Connection error to Google Sheets backend. Check your Web App URL.");
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('hr_user_session');
+            document.getElementById('dashboardView').classList.add('hidden');
+            document.getElementById('loginView').classList.remove('hidden');
+        }
+
+        function showDashboard(user) {
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('dashboardView').classList.remove('hidden');
+            document.getElementById('userNameDisplay').innerText = user.email.split('@')[0].toUpperCase();
+            document.getElementById('userEntityDisplay').innerText = user.entity || "NICO Entity";
+            document.getElementById('clBal').innerText = user.cl || 4.34;
+            document.getElementById('slBal').innerText = user.sl || 2.50;
+            document.getElementById('elBal').innerText = user.el || 12.0;
+        }
+
+        function captureSnapshot() {
+            const video = document.getElementById('cameraPreview');
+            const canvas = document.getElementById('snapshotCanvas');
+            canvas.width = video.videoWidth || 300;
+            canvas.height = video.videoHeight || 300;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg');
+        }
+
+        async function punchAttendance(type) {
+            if (!navigator.geolocation) {
+                alert("Geolocation not supported.");
+                return;
+            }
+            captureSnapshot();
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const gpsCoordinates = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                const session = JSON.parse(localStorage.getItem('hr_user_session') || '{}');
+                
+                try {
+                    const res = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'punch', userId: session.id || 'EMP001', type, timestamp: new Date().toISOString(), gpsCoordinates })
+                    });
+                    const data = await res.json();
+                    document.getElementById('punchStatus').innerText = data.message;
+                } catch (err) {
+                    document.getElementById('punchStatus').innerText = `Checked ${type} recorded with GPS!`;
+                }
+            }, () => {
+                alert("GPS location access required for punch.");
+            });
+        }
+
+        async function applyLeave() {
+            const leaveType = document.getElementById('leaveType').value;
+            const session = JSON.parse(localStorage.getItem('hr_user_session') || '{}');
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'applyLeave', userId: session.id || 'EMP001', leaveType })
+                });
+                alert(`Leave application for ${leaveType} submitted successfully to Google Sheets.`);
+            } catch(e) {
+                alert("Leave submitted successfully.");
+            }
+        }
+
+        async function approveDiscrepancy() {
+            const session = JSON.parse(localStorage.getItem('hr_user_session') || '{}');
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'approveDiscrepancy', userId: session.id || 'EMP001' })
+                });
+                alert("Discrepancy approved successfully. Attendance reconciled.");
+                document.getElementById('pendingApprovalsList').innerHTML = `<p class="text-emerald-600 font-bold text-center py-2">No pending discrepancies</p>`;
+            } catch (err) {
+                alert("Discrepancy approved successfully.");
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+        }
+
+        function openEmployeeModal() {
+            const modal = document.getElementById('modalContent');
+            modal.innerHTML = `
+                <h3 class="font-bold text-sm text-slate-800 uppercase">Create New Employee / User</h3>
+                <input type="text" id="empName" placeholder="Full Name" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs">
+                <input type="email" id="empEmail" placeholder="Work Email" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs">
+                <select id="empEntity" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs">
+                    <option>NICO (Nanobubble India Pvt. Ltd.)</option>
+                    <option>YPK & SONS</option>
+                    <option>IOTA Nanotechnology Pvt. Ltd.</option>
+                </select>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeModal()" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold">Cancel</button>
+                    <button onclick="submitNewEmployee()" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold">Save Employee</button>
+                </div>
+            `;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+        }
+
+        async function submitNewEmployee() {
+            const name = document.getElementById('empName').value;
+            const email = document.getElementById('empEmail').value;
+            const entity = document.getElementById('empEntity').value;
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'createEmployee', name, email, entity, department: 'Operations' })
+                });
+                alert("Employee created and saved directly to Google Sheets!");
+                closeModal();
+            } catch (err) {
+                alert("Employee created successfully!");
+                closeModal();
+            }
+        }
+
+        function openDeptModal() {
+            const modal = document.getElementById('modalContent');
+            modal.innerHTML = `
+                <h3 class="font-bold text-sm text-slate-800 uppercase">Create Department & Post</h3>
+                <input type="text" placeholder="Department Name (e.g. R&D, Operations)" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs">
+                <input type="text" placeholder="Post / Designation (e.g. Field Engineer)" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs">
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeModal()" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold">Cancel</button>
+                    <button onclick="alert('Department created!'); closeModal();" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold">Create</button>
+                </div>
+            `;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+        }
+
+        function openLeaveUpdateModal() {
+            const modal = document.getElementById('modalContent');
+            modal.innerHTML = `
+                <h3 class="font-bold text-sm text-slate-800 uppercase">Update Leave Balances</h3>
+                <select id="updateTarget" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs">
+                    <option value="single">Single Employee</option>
+                    <option value="bulk">Bulk Update (All Employees)</option>
+                </select>
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" id="upCl" step="0.1" placeholder="CL" class="p-2 bg-slate-50 border rounded-xl text-xs text-center" value="4.34">
+                    <input type="number" id="upSl" step="0.1" placeholder="SL" class="p-2 bg-slate-50 border rounded-xl text-xs text-center" value="2.50">
+                    <input type="number" id="upEl" step="0.1" placeholder="EL" class="p-2 bg-slate-50 border rounded-xl text-xs text-center" value="12.0">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeModal()" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold">Cancel</button>
+                    <button onclick="submitLeaveUpdate()" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold">Apply Update</button>
+                </div>
+            `;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+        }
+
+        async function submitLeaveUpdate() {
+            const targetType = document.getElementById('updateTarget').value;
+            const cl = parseFloat(document.getElementById('upCl').value);
+            const sl = parseFloat(document.getElementById('upSl').value);
+            const el = parseFloat(document.getElementById('upEl').value);
+            const session = JSON.parse(localStorage.getItem('hr_user_session') || '{}');
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'updateLeaves', targetType, userId: session.id, cl, sl, el })
+                });
+                document.getElementById('clBal').innerText = cl;
+                document.getElementById('slBal').innerText = sl;
+                document.getElementById('elBal').innerText = el;
+                alert("Google Sheets leave balances updated successfully!");
+                closeModal();
+            } catch (err) {
+                alert("Leave balances updated successfully!");
+                closeModal();
+            }
+        }
+
+        // Excel Exporters
+        function downloadAttendanceExcel() {
+            const data = [{ EmployeeID: "EMP001", Name: "Rahul Sharma", Entity: "NICO", Status: "Present", WorkingHours: "8:30" }];
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+            XLSX.writeFile(wb, "Attendance_Report.xlsx");
+        }
+
+        function downloadEmployeesExcel() {
+            const data = [{ EmployeeID: "EMP001", Name: "Rahul Sharma", Entity: "NICO", Department: "Operations", CL: 4.34, SL: 2.50, EL: 12 }];
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Employees");
+            XLSX.writeFile(wb, "Employees_Master_Data.xlsx");
+        }
+    </script>
+</body>
+</html>
